@@ -1,0 +1,33 @@
+# Use an official Python runtime as a parent image
+FROM python:3.10-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies (needed for SimpleITK and other imaging libs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+# Note: You should generate a requirements.txt file first
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the backend code
+COPY . .
+
+# Create directory for models if it doesn't exist
+RUN mkdir -p models_and_embeddings
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Start the application using integrated2.py (the main entry point)
+CMD ["uvicorn", "integrated2.py:app", "--host", "0.0.0.0", "--port", "8000"]
