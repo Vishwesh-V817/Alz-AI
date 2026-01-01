@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Drug Repurposing AI</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #1a1f2b; 
+            color: white; 
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #37c07e; margin-bottom: 30px; }
+        .card { 
+            background: #2c3e50; 
+            padding: 25px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        input { 
+            padding: 12px; 
+            width: 400px; 
+            border-radius: 5px; 
+            border: none; 
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button { 
+            padding: 12px 24px; 
+            background: #37c07e; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 14px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover { background: #2da368; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .res-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px;
+            background: #34495e;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .res-table th { 
+            padding: 15px; 
+            background: #2c3e50;
+            text-align: left; 
+            font-weight: bold;
+            color: #37c07e;
+        }
+        .res-table td { 
+            padding: 12px 15px; 
+            border-bottom: 1px solid #455a64; 
+            text-align: left; 
+        }
+        .res-table tr:last-child td { border-bottom: none; }
+        .elite { color: #37c07e; font-weight: bold; }
+        .strong { color: #3498db; font-weight: bold; }
+        .moderate { color: #f39c12; }
+        .weak { color: #e74c3c; }
+        .smiles-display {
+            background: #1a1f2b;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+            margin: 15px 0;
+        }
+        .prediction-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .confidence {
+            font-size: 11px;
+            color: #95a5a6;
+        }
+        .error {
+            color: #e74c3c;
+            background: #2c1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #e74c3c;
+        }
+        .loading {
+            color: #3498db;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧬 AD Drug Repurposing AI</h1>
+    <div class="card">
+        <input type="text" id="query" placeholder="Enter SMILES (e.g., CC(C)NCC(COc1ccccc1CC=C)O for Donepezil)">
+        <button id="analyzeBtn" onclick="run()">Analyze Interaction</button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        async function run() {
+            const q = document.getElementById('query').value.trim();
+            const div = document.getElementById('output');
+            const btn = document.getElementById('analyzeBtn');
+            
+            if (!q) {
+                div.innerHTML = '<div class="error">Please enter a SMILES string</div>';
+                return;
+            }
+            
+            btn.disabled = true;
+            div.innerHTML = '<div class="card loading">🔬 Processing molecular structure and analyzing protein interactions...</div>';
+            
+            try {
+                const res = await fetch(`http://localhost:8001/repurpose?query=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                
+                if(data.error) { 
+                    div.innerHTML = `<div class="card error"><strong>Error:</strong> ${data.error}</div>`; 
+                    btn.disabled = false;
+                    return; 
+                }
+
+                let html = `<div class="card">
+                    <h3>Input SMILES:</h3>
+                    <div class="smiles-display">${data.smiles}</div>
+                    <h3>Top Protein Targets & Binding Predictions:</h3>
+                    <table class="res-table">
+                        <tr>
+                            <th>Target</th>
+                            <th>UniProt</th>
+                            <th>Similarity</th>
+                            <th>Ki</th>
+                            <th>IC50</th>
+                            <th>EC50</th>
+                            <th>Kd</th>
+                        </tr>`;
+                
+                data.results.forEach(r => {
+                    html += `<tr>
+                        <td><b>${r.target}</b></td>
+                        <td>${r.uniprot}</td>
+                        <td><b>${r.similarity}%</b></td>
+                        <td>
+                            <div class="prediction-cell">
+                                <span class="${r.predictions.Ki.label.toLowerCase()}">${r.predictions.Ki.label}</span>
+                                <span class="confidence">${r.predictions.Ki.confidence}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="prediction-cell">
+                                <span class="${r.predictions.IC50.label.toLowerCase()}">${r.predictions.IC50.label}</span>
+                                <span class="confidence">${r.predictions.IC50.confidence}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="prediction-cell">
+                                <span class="${r.predictions.EC50.label.toLowerCase()}">${r.predictions.EC50.label}</span>
+                                <span class="confidence">${r.predictions.EC50.confidence}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="prediction-cell">
+                                <span class="${r.predictions.Kd.label.toLowerCase()}">${r.predictions.Kd.label}</span>
+                                <span class="confidence">${r.predictions.Kd.confidence}%</span>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+                
+                html += `</table></div>`;
+                div.innerHTML = html;
+            } catch (error) {
+                div.innerHTML = `<div class="card error"><strong>Connection Error:</strong> ${error.message}<br><br>Make sure the FastAPI server is running on port 8001.</div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        // Allow Enter key to trigger search
+        document.getElementById('query').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') run();
+        });
+    </script>
+</body>
+</html>

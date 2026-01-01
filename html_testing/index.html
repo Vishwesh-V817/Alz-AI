@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Alzheimer AI Diagnostic</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #cbd5e1; display: flex; justify-content: center; padding: 50px; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 450px; text-align: center; }
+        .drop-zone { border: 2px dashed #94a3b8; padding: 40px; border-radius: 10px; cursor: pointer; transition: 0.3s; margin-bottom: 20px; }
+        .drop-zone:hover { border-color: #37c07e; background: #f8fafc; }
+        .btn { background: #37c07e; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
+        .btn:disabled { background: #ccc; }
+        #result { margin-top: 20px; text-align: left; display: none; padding: 15px; background: #f1f5f9; border-radius: 8px; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #37c07e; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: none; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Alzheimer's MRI Analysis</h2>
+    <p style="font-size: 13px; color: #64748b;">Upload ZIP (DICOMs/Images) or a Single Image</p>
+    
+    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+        <span id="fileName">Click to Browse or Drop File</span>
+        <input type="file" id="fileInput" hidden onchange="updateFileName()">
+    </div>
+
+    <button class="btn" id="uploadBtn" onclick="uploadFile()">Run AI Prediction</button>
+    <div class="loader" id="loader"></div>
+
+    <div id="result">
+        <h3 id="predClass" style="margin: 0; color: #1e293b;"></h3>
+        <p id="predConf" style="font-weight: bold; color: #37c07e;"></p>
+        <hr>
+        <small id="predDetails"></small>
+    </div>
+</div>
+
+<script>
+    function updateFileName() {
+        const input = document.getElementById('fileInput');
+        document.getElementById('fileName').innerText = input.files[0].name;
+    }
+
+    async function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        if (!fileInput.files[0]) return alert("Please select a file!");
+
+        const btn = document.getElementById('uploadBtn');
+        const loader = document.getElementById('loader');
+        const resDiv = document.getElementById('result');
+
+        btn.disabled = true;
+        loader.style.display = 'block';
+        resDiv.style.display = 'none';
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        try {
+            const response = await fetch("http://localhost:8000/predict-mri", {
+                method: "POST",
+                body: formData
+            });
+            const data = await response.json();
+
+            document.getElementById('predClass').innerText = data.prediction.replace('_', ' ');
+            document.getElementById('predConf').innerText = `Confidence: ${(data.confidence * 100).toFixed(2)}%`;
+            // Changed to 'all_probs' to match the backend dictionary key
+            document.getElementById('predDetails').innerText = JSON.stringify(data.all_probs, null, 2);
+            resDiv.style.display = 'block';
+        } catch (err) {
+            alert("Error connecting to server!");
+        } finally {
+            btn.disabled = false;
+            loader.style.display = 'none';
+        }
+    }
+</script>
+</body>
+</html>
